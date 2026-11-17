@@ -1136,7 +1136,9 @@ input_type (string)::
 	This will be +"keyboard"+, +"mouse"+ or +"gesture"+ depending on whether
 	this was a keyboard binding, a mouse binding or a touchpad gesture binding
 	(configured with +bindgesture+). For gesture bindings, +input_code+ is 0
-	and +event_state_mask+ is empty.
+	and +event_state_mask+ is empty. A gesture binding configured with
+	+--continuous+ also sends this event each time it runs while the gesture
+	is still in progress.
 
 *Example:*
 ---------------------------

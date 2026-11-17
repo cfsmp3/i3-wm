@@ -602,7 +602,7 @@ X servers, i3 accepts gesture bindings, but they never trigger.
 
 *Syntax*:
 -------------------------------------------------------------------------------------
-bindgesture [--exact] [--input-device=<device>] [--no-warn] <type>[:<fingers>][:<directions>] command
+bindgesture [--exact] [--input-device=<device>] [--no-warn] [--continuous] <type>[:<fingers>][:<directions>] command
 -------------------------------------------------------------------------------------
 
 The options have to be given before the gesture, in any order. An option may be
@@ -642,10 +642,10 @@ as not specifying a device. The device name has to be joined to the option with
 +=+.
 
 Two gesture bindings in the same mode which have the same kind of gesture,
-number of fingers, set of directions, device and +--exact+ setting are
-duplicates: the later binding replaces the earlier binding, and i3 reports this
-as an error like a duplicate key binding. Use +--no-warn+ on the later binding
-to replace the earlier binding silently.
+number of fingers, set of directions, device, +--exact+ setting and
++--continuous+ setting are duplicates: the later binding replaces the earlier
+binding, and i3 reports this as an error like a duplicate key binding. Use
++--no-warn+ on the later binding to replace the earlier binding silently.
 
 How i3 recognizes the directions of a gesture::
 	A gesture lasts from its begin event to its end event. If the gesture is
@@ -678,8 +678,23 @@ Precedence::
 	binding with more directions wins. If the bindings are still equally
 	specific, the one which comes later in the configuration file wins (a
 	binding which replaced a duplicate counts at the position of the
-	replacing line). The number of fingers and the modifier keys held during
-	the gesture do not matter for the precedence.
+	replacing line). The number of fingers, the modifier keys held during
+	the gesture and +--continuous+ do not matter for the precedence.
+
+Continuous bindings::
+	A binding with +--continuous+ runs not only when the gesture ends, but
+	also while it is in progress: on every update of the gesture, even if
+	the update does not change its directions, i3 adds the update's
+	movement, rotation and scale to the gesture and then checks the
+	continuous bindings of the current mode against the gesture as gathered
+	so far, using the same rules for the directions, the matching and the
+	precedence as above. The best matching continuous binding (if any) is
+	run; an update which matches no continuous binding runs nothing. Nothing
+	runs when a gesture begins. When the gesture ends, all bindings of the
+	current mode (continuous or not) are checked again as described above,
+	so a continuous binding can run once more at the end, or a different
+	binding wins. Runs made during the gesture stay in effect even if the
+	gesture is cancelled afterwards.
 
 Passing gestures to applications::
 	As soon as the current binding mode contains a binding for swipes, i3
@@ -688,8 +703,8 @@ Passing gestures to applications::
 	that applications no longer receive any swipes. A swipe which does not
 	match any binding then does nothing. The same applies to pinches. If the
 	current binding mode contains no binding for a kind of gesture,
-	applications receive these gestures as usual. +hold+ bindings never
-	grab anything, and
+	applications receive these gestures as usual. Continuous bindings grab
+	like any other binding. +hold+ bindings never grab anything, and
 	gestures of floating devices (see +xinput float+) are left alone.
 
 Binding modes, reload and restart::
@@ -698,12 +713,14 @@ Binding modes, reload and restart::
 	the gesture is neither cancelled nor handed over part-way: whether
 	applications receive it was settled when it began, and the movement
 	gathered so far is kept. The mode in force when the gesture ends decides
-	which binding runs, and the binding event names that mode. A +reload+
-	or +restart+ starts without any gesture bindings and in the default
-	mode: only the bindings in the configuration (and the files it includes)
-	as read again are used afterwards.
+	which binding runs, and the binding event names that mode; for a
+	continuous binding run on an update, it is the mode in force when that
+	update arrives. A +reload+ or +restart+ starts without any gesture
+	bindings and in the default mode: only the bindings in the configuration
+	(and the files it includes) as read again are used afterwards.
 
-When a gesture binding runs, i3 sends a binding event with +input_type+
+When a gesture binding runs (at the end of a gesture or, for a continuous
+binding, on an update), i3 sends a binding event with +input_type+
 +"gesture"+ via IPC, see https://i3wm.org/docs/ipc.html#_binding_event.
 
 *Examples*:
@@ -721,17 +738,21 @@ bindgesture --input-device="SynPS/2 Synaptics TouchPad" swipe:4:up scratchpad sh
 
 # Rotating clockwise while pinching inward, regardless of any movement
 bindgesture pinch:inward+clockwise kill
+
+# Move the focus on every update of a four finger swipe, not only at its end
+bindgesture --continuous swipe:4:left focus left
+bindgesture --continuous swipe:4:right focus right
 --------------------------------
 
 *Removing gesture bindings*:
 -------------------------------------------------------------------------------------
-unbindgesture [--exact] [--input-device=<device>] <type>[:<fingers>][:<directions>]
+unbindgesture [--exact] [--input-device=<device>] [--continuous] <type>[:<fingers>][:<directions>]
 -------------------------------------------------------------------------------------
 
 +unbindgesture+ removes the gesture binding of the same mode which is the same
 as the given gesture: it has to match the binding in its device, its +--exact+
-setting, its set of directions, its number of fingers (or both specify no
-number of fingers) and its kind of gesture. As for duplicates,
+and +--continuous+ settings, its set of directions, its number of fingers (or
+both specify no number of fingers) and its kind of gesture. As for duplicates,
 +--input-device=*+ is the same as no device, +any+ the same as no direction and
 the order and repetition of options and directions does not matter. Nothing may
 follow the gesture, and +--no-warn+ is not accepted.

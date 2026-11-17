@@ -51,6 +51,9 @@ bindgesture swipe:2:right --exact nop options after the gesture belong to the co
 bindgesture --input-device=* pinch:clockwise+inward nop all devices
 bindgesture pinch:any nop any pinch
 bindgesture hold nop hold
+bindgesture --continuous swipe:3:left nop continuous, not a duplicate
+bindgesture --continuous --continuous --input-device="$pad" pinch:2:inward nop repeated continuous
+bindgesture --continuous hold nop continuous hold
 mode "gestures" {
     bindgesture swipe:3:left workspace prev
 }
@@ -100,10 +103,18 @@ is($ret, 0, 'duplicate gesture binding with --no-warn: exit code == 0');
 is($out, '', 'duplicate gesture binding with --no-warn: no output');
 
 ($ret, $out) = check_config(<<'EOT');
+bindgesture --continuous swipe:3:left nop first
+bindgesture --continuous swipe:3:left nop second
+EOT
+is($ret, 1, 'duplicate continuous gesture bindings: exit code == 1');
+like($out, qr/ERROR: *Duplicate gesture binding/, 'duplicate continuous gesture bindings reported');
+
+($ret, $out) = check_config(<<'EOT');
 bindgesture swipe:left nop first
 bindgesture --exact swipe:left nop exact
 bindgesture swipe:3:left nop three fingers
 bindgesture --input-device="Touchpad" swipe:left nop device
+bindgesture --continuous swipe:left nop continuous
 mode "other" {
     bindgesture swipe:left nop other mode
 }
@@ -123,6 +134,9 @@ bindgesture --exact --input-device="$pad" pinch:up+inward nop removed
 unbindgesture --input-device=Touchpad --input-device="$pad" --exact pinch:inward+up
 bindgesture --input-device=* swipe:right nop removed
 unbindgesture swipe:any+right
+bindgesture --continuous swipe:2:up nop removed
+bindgesture swipe:2:up nop stays
+unbindgesture --continuous swipe:2:up
 bindgesture swipe:3:left nop added again
 mode "other" {
     bindgesture swipe:left nop other mode
@@ -137,6 +151,7 @@ for my $config (
     "bindgesture swipe:left nop\nunbindgesture swipe:3:left\n",
     "bindgesture swipe:left nop\nunbindgesture --exact swipe:left\n",
     "bindgesture swipe:left nop\nunbindgesture --continuous swipe:left\n",
+    "bindgesture --continuous swipe:left nop\nunbindgesture swipe:left\n",
     "bindgesture swipe:left nop\nunbindgesture --input-device=Touchpad swipe:left\n",
     "bindgesture --input-device=Touchpad swipe:left nop\nunbindgesture --input-device=touchpad swipe:left\n",
     "bindgesture swipe:left nop\nunbindgesture pinch:left\n",

@@ -189,7 +189,8 @@ static bool gesture_binding_same(const GestureBinding *a, const GestureBinding *
     if (a->type != b->type ||
         a->fingers != b->fingers ||
         a->directions != b->directions ||
-        a->exact != b->exact) {
+        a->exact != b->exact ||
+        a->continuous != b->continuous) {
         return false;
     }
     if (a->input_device == NULL || b->input_device == NULL) {
@@ -203,7 +204,7 @@ static bool gesture_binding_same(const GestureBinding *a, const GestureBinding *
  * NULL if the gesture specification contains an error.
  *
  */
-static GestureBinding *gesture_binding_from_config(bool exact, const char *input_device,
+static GestureBinding *gesture_binding_from_config(bool exact, bool continuous, const char *input_device,
                                                    const char *gesture, const char *directive) {
     if (gesture[0] == '-') {
         ELOG("Unknown option \"%s\" for %s, ignoring this line.\n", gesture, directive);
@@ -218,6 +219,7 @@ static GestureBinding *gesture_binding_from_config(bool exact, const char *input
     }
 
     bind->exact = exact;
+    bind->continuous = continuous;
     /* "*" means all devices, which is the same as not specifying a device. */
     if (input_device != NULL && strcmp(input_device, "*") != 0) {
         bind->input_device = sstrdup(input_device);
@@ -254,13 +256,13 @@ static GestureBinding *find_same_gesture_binding(const struct Mode *mode, const 
  * earlier binding without --no-warn), true otherwise.
  *
  */
-bool configure_gesture_binding(bool exact, const char *input_device, bool no_warn,
+bool configure_gesture_binding(bool exact, bool continuous, const char *input_device, bool no_warn,
                                const char *gesture, const char *command, const char *modename,
                                bool pango_markup) {
-    DLOG("Gesture binding %s, exact %d, input device %s, no-warn %d, command %s\n",
-         gesture, exact, input_device ? input_device : "*", no_warn, command);
+    DLOG("Gesture binding %s, exact %d, continuous %d, input device %s, no-warn %d, command %s\n",
+         gesture, exact, continuous, input_device ? input_device : "*", no_warn, command);
 
-    GestureBinding *new_binding = gesture_binding_from_config(exact, input_device, gesture, "bindgesture");
+    GestureBinding *new_binding = gesture_binding_from_config(exact, continuous, input_device, gesture, "bindgesture");
     if (new_binding == NULL) {
         return false;
     }
@@ -300,12 +302,12 @@ bool configure_gesture_binding(bool exact, const char *input_device, bool no_war
  * no such binding, true otherwise.
  *
  */
-bool unconfigure_gesture_binding(bool exact, const char *input_device,
+bool unconfigure_gesture_binding(bool exact, bool continuous, const char *input_device,
                                  const char *gesture, const char *modename) {
-    DLOG("Removing gesture binding %s, exact %d, input device %s\n",
-         gesture, exact, input_device ? input_device : "*");
+    DLOG("Removing gesture binding %s, exact %d, continuous %d, input device %s\n",
+         gesture, exact, continuous, input_device ? input_device : "*");
 
-    GestureBinding *removed = gesture_binding_from_config(exact, input_device, gesture, "unbindgesture");
+    GestureBinding *removed = gesture_binding_from_config(exact, continuous, input_device, gesture, "unbindgesture");
     if (removed == NULL) {
         return false;
     }
@@ -521,23 +523,28 @@ static int gesture_binding_compare(const GestureBinding *a, const GestureBinding
 
 /*
  * Runs the best matching gesture binding of the current mode (if any) for the
- * gesture which just ended.
+ * gesture as gathered so far. When the gesture is still in progress (on an
+ * update), only continuous bindings are considered; when it ends, all
+ * bindings are.
  *
  */
-static void gesture_tracker_run(const struct gesture_tracker *tracker) {
+static void gesture_tracker_run(const struct gesture_tracker *tracker, bool in_progress) {
     const uint32_t directions = gesture_tracker_directions(tracker);
-    DLOG("Gesture ended: type %d, fingers %d, device \"%s\", dx %f, dy %f, scale %f, rotation %f, directions 0x%x\n",
-         tracker->type, tracker->fingers,
+    DLOG("Gesture %s: type %d, fingers %d, device \"%s\", dx %f, dy %f, scale %f, rotation %f, directions 0x%x\n",
+         in_progress ? "updated" : "ended", tracker->type, tracker->fingers,
          tracker->device_name ? tracker->device_name : "(unknown)",
          tracker->dx, tracker->dy, tracker->scale, tracker->rotation, directions);
 
     GestureBinding *bind, *best = NULL;
     TAILQ_FOREACH (bind, gesture_bindings, gesture_bindings) {
+        if (in_progress && !bind->continuous) {
+            continue;
+        }
         if (!gesture_binding_matches(bind, tracker, directions)) {
             continue;
         }
         /* On equal priority, the binding defined later in the configuration
-         * wins. */
+         * wins. Whether a binding is continuous does not matter here. */
         if (best == NULL || gesture_binding_compare(bind, best) >= 0) {
             best = bind;
         }
@@ -562,7 +569,8 @@ static void gesture_tracker_run(const struct gesture_tracker *tracker) {
 /*
  * Handles an XInput gesture event: tracks the gesture from its begin event to
  * its end event and runs the best matching gesture binding of the current
- * binding mode once the gesture ends.
+ * binding mode once the gesture ends. On every update of the gesture, the best
+ * matching continuous gesture binding (if any) is run as well.
  *
  */
 void handle_gesture_event(xcb_generic_event_t *event) {
@@ -635,6 +643,7 @@ void handle_gesture_event(xcb_generic_event_t *event) {
             }
             /* The number of fingers and the device are those of the begin
              * event, even if an update reports a different number. */
+            gesture_tracker_run(tracker, true);
             break;
 
         case XCB_INPUT_GESTURE_PINCH_END:
@@ -646,7 +655,7 @@ void handle_gesture_event(xcb_generic_event_t *event) {
             if (flags & XCB_INPUT_GESTURE_SWIPE_EVENT_FLAGS_GESTURE_SWIPE_CANCELLED) {
                 DLOG("Gesture was cancelled.\n");
             } else {
-                gesture_tracker_run(tracker);
+                gesture_tracker_run(tracker, false);
             }
             free_tracker(tracker);
             break;

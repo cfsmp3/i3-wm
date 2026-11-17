@@ -406,7 +406,8 @@ struct Binding {
 /**
  * Holds a touchpad gesture binding (bindgesture), consisting of the kind of
  * gesture, an optional number of fingers, a set of directions and the command
- * which is executed when a matching gesture ends.
+ * which is executed when a matching gesture ends (and, for continuous
+ * bindings, also on every update while the gesture is in progress).
  *
  */
 struct GestureBinding {
@@ -424,6 +425,10 @@ struct GestureBinding {
     /** If true, the directions of the gesture need to be exactly the
      * directions of this binding (instead of a superset). */
     bool exact;
+
+    /** If true, the binding also runs on every update of a matching gesture
+     * which is still in progress, not only when the gesture ends. */
+    bool continuous;
 
     /** The XInput name of the (slave) device this binding is restricted to,
      * or NULL if the binding applies to all devices. */

@@ -465,12 +465,12 @@ state BINDCOMMAND:
   command = string
       -> call cfg_binding($bindtype, $modifiers, $key, $release, $border, $whole_window, $exclude_titlebar, $command)
 
-# bindgesture [--exact] [--input-device=<device>] [--no-warn] <gesture> <command>
+# bindgesture [--exact] [--input-device=<device>] [--no-warn] [--continuous] <gesture> <command>
 #
 # Each option is passed on by a separate call (and may be repeated, the last
 # --input-device=<device> wins).
 state GESTURE:
-  option = '--exact', '--no-warn'
+  option = '--exact', '--no-warn', '--continuous'
       -> call cfg_gesture_option($option); GESTURE
   '--input-device='
       -> GESTURE_INPUT_DEVICE
@@ -485,9 +485,9 @@ state GESTURE_COMMAND:
   command = string
       -> call cfg_gesture_binding($gesture, $command)
 
-# unbindgesture [--exact] [--input-device=<device>] <gesture>
+# unbindgesture [--exact] [--input-device=<device>] [--continuous] <gesture>
 state UNBIND_GESTURE:
-  option = '--exact'
+  option = '--exact', '--continuous'
       -> call cfg_gesture_option($option); UNBIND_GESTURE
   '--input-device='
       -> UNBIND_GESTURE_INPUT_DEVICE
@@ -566,7 +566,7 @@ state MODE_BINDCOMMAND:
       -> call cfg_mode_binding($bindtype, $modifiers, $key, $release, $border, $whole_window, $exclude_titlebar, $command); MODE
 
 state MODE_GESTURE:
-  option = '--exact', '--no-warn'
+  option = '--exact', '--no-warn', '--continuous'
       -> call cfg_gesture_option($option); MODE_GESTURE
   '--input-device='
       -> MODE_GESTURE_INPUT_DEVICE
@@ -582,7 +582,7 @@ state MODE_GESTURE_COMMAND:
       -> call cfg_mode_gesture_binding($gesture, $command); MODE
 
 state MODE_UNBIND_GESTURE:
-  option = '--exact'
+  option = '--exact', '--continuous'
       -> call cfg_gesture_option($option); MODE_UNBIND_GESTURE
   '--input-device='
       -> MODE_UNBIND_GESTURE_INPUT_DEVICE

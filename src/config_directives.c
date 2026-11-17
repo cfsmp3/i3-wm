@@ -187,12 +187,14 @@ CFGFUN(binding, const char *bindtype, const char *modifiers, const char *key, co
  */
 static struct {
     bool exact;
+    bool continuous;
     bool no_warn;
     char *input_device;
 } gesture_options;
 
 CFGFUN(gesture_start) {
     gesture_options.exact = false;
+    gesture_options.continuous = false;
     gesture_options.no_warn = false;
     FREE(gesture_options.input_device);
 }
@@ -200,6 +202,8 @@ CFGFUN(gesture_start) {
 CFGFUN(gesture_option, const char *option) {
     if (strcmp(option, "--exact") == 0) {
         gesture_options.exact = true;
+    } else if (strcmp(option, "--continuous") == 0) {
+        gesture_options.continuous = true;
     } else if (strcmp(option, "--no-warn") == 0) {
         gesture_options.no_warn = true;
     }
@@ -211,7 +215,7 @@ CFGFUN(gesture_input_device, const char *input_device) {
 }
 
 CFGFUN(gesture_binding, const char *gesture, const char *command) {
-    if (!configure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+    if (!configure_gesture_binding(gesture_options.exact, gesture_options.continuous, gesture_options.input_device,
                                    gesture_options.no_warn,
                                    gesture, command, DEFAULT_BINDING_MODE, false)) {
         result->has_errors = true;
@@ -219,7 +223,7 @@ CFGFUN(gesture_binding, const char *gesture, const char *command) {
 }
 
 CFGFUN(gesture_unbinding, const char *gesture) {
-    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.continuous, gesture_options.input_device,
                                      gesture, DEFAULT_BINDING_MODE)) {
         result->has_errors = true;
     }
@@ -247,7 +251,7 @@ CFGFUN(mode_gesture_binding, const char *gesture, const char *command) {
         return;
     }
 
-    if (!configure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+    if (!configure_gesture_binding(gesture_options.exact, gesture_options.continuous, gesture_options.input_device,
                                    gesture_options.no_warn,
                                    gesture, command, current_mode, current_mode_pango_markup)) {
         result->has_errors = true;
@@ -260,7 +264,7 @@ CFGFUN(mode_gesture_unbinding, const char *gesture) {
         return;
     }
 
-    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.continuous, gesture_options.input_device,
                                      gesture, current_mode)) {
         result->has_errors = true;
     }

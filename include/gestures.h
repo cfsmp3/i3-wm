@@ -24,7 +24,7 @@
  * earlier binding without --no-warn), true otherwise.
  *
  */
-bool configure_gesture_binding(bool exact, const char *input_device, bool no_warn,
+bool configure_gesture_binding(bool exact, bool continuous, const char *input_device, bool no_warn,
                                const char *gesture, const char *command, const char *modename,
                                bool pango_markup);
 
@@ -37,7 +37,7 @@ bool configure_gesture_binding(bool exact, const char *input_device, bool no_war
  * no such binding, true otherwise.
  *
  */
-bool unconfigure_gesture_binding(bool exact, const char *input_device,
+bool unconfigure_gesture_binding(bool exact, bool continuous, const char *input_device,
                                  const char *gesture, const char *modename);
 
 /**
@@ -64,7 +64,8 @@ bool gestures_is_gesture_event(int type, xcb_generic_event_t *event);
 /**
  * Handles an XInput gesture event: tracks the gesture from its begin event to
  * its end event and runs the best matching gesture binding of the current
- * binding mode once the gesture ends.
+ * binding mode once the gesture ends. On every update of the gesture, the best
+ * matching continuous gesture binding (if any) is run as well.
  *
  */
 void handle_gesture_event(xcb_generic_event_t *event);

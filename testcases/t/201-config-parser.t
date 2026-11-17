@@ -82,11 +82,15 @@ bindgesture --no-warn --input-device="Second Pad" --exact hold nop flags
 bindgesture --input-device=* swipe:right nop all devices
 bindgesture --input-device=Touchpad --input-device="Second Pad" --exact swipe nop repeated
 bindgesture swipe:left --exact nop option after the gesture
+bindgesture --continuous --exact --continuous swipe:3:up nop continuous
 unbindgesture --exact --input-device="Second Pad" pinch:2:inward+clockwise
+unbindgesture --continuous swipe:3:up
 mode "meh" {
     bindgesture swipe:4 nop in mode
     bindgesture --exact --input-device="Touchpad" pinch:outward nop exact in mode
+    bindgesture --continuous pinch:2 nop continuous in mode
     unbindgesture swipe:4
+    unbindgesture --continuous pinch:2
 }
 EOT
 
@@ -112,9 +116,17 @@ cfg_gesture_binding(swipe, nop repeated)
 cfg_gesture_start()
 cfg_gesture_binding(swipe:left, --exact nop option after the gesture)
 cfg_gesture_start()
+cfg_gesture_option(--continuous)
+cfg_gesture_option(--exact)
+cfg_gesture_option(--continuous)
+cfg_gesture_binding(swipe:3:up, nop continuous)
+cfg_gesture_start()
 cfg_gesture_option(--exact)
 cfg_gesture_input_device(Second Pad)
 cfg_gesture_unbinding(pinch:2:inward+clockwise)
+cfg_gesture_start()
+cfg_gesture_option(--continuous)
+cfg_gesture_unbinding(swipe:3:up)
 cfg_enter_mode((null), meh)
 cfg_gesture_start()
 cfg_mode_gesture_binding(swipe:4, nop in mode)
@@ -123,7 +135,13 @@ cfg_gesture_option(--exact)
 cfg_gesture_input_device(Touchpad)
 cfg_mode_gesture_binding(pinch:outward, nop exact in mode)
 cfg_gesture_start()
+cfg_gesture_option(--continuous)
+cfg_mode_gesture_binding(pinch:2, nop continuous in mode)
+cfg_gesture_start()
 cfg_mode_gesture_unbinding(swipe:4)
+cfg_gesture_start()
+cfg_gesture_option(--continuous)
+cfg_mode_gesture_unbinding(pinch:2)
 EOT
 
 is(parser_calls($config),
