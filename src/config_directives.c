@@ -420,14 +420,41 @@ static void include_override(struct ConfigResultIR *result, char **words, size_t
     free(scope);
 }
 
+/*
+ * Records the include --override line which is being parsed, with its
+ * variables filled in as they are now, so that the variable-replaced contents
+ * of its file show the line as it was when it was reached (see
+ * parse_file()).
+ *
+ */
+static void include_fill_line(struct parser_ctx *ctx) {
+    const char *end = strchr(ctx->line, '\n');
+    char *line = (end != NULL ? sstrndup(ctx->line, end - ctx->line) : sstrdup(ctx->line));
+
+    struct filled_line *filled = scalloc(1, sizeof(struct filled_line));
+    filled->line = ctx->line;
+    filled->contents = replace_variables(&(ctx->variables), line);
+    TAILQ_INSERT_TAIL(&(ctx->filled_lines), filled, filled_lines);
+    free(line);
+}
+
 CFGFUN(include, const char *override, const char *pattern) {
-    DLOG("include %s%s\n", (override ? "--override " : ""), pattern);
+    /* The variables in the patterns of an include --override line were left
+     * in place when its file was read (see parse_file()). They are filled in
+     * now, from the values given in the files read so far, so that a file read
+     * earlier can define where later files are found. */
+    char *filled = (override ? replace_variables(&(result->ctx->variables), pattern) : sstrdup(pattern));
+    DLOG("include %s%s\n", (override ? "--override " : ""), filled);
+    if (override) {
+        include_fill_line(result->ctx);
+    }
 
     wordexp_t p;
-    const int ret = wordexp(pattern, &p, 0);
+    const int ret = wordexp(filled, &p, 0);
     if (ret != 0) {
-        ELOG("wordexp(%s): error %d\n", pattern, ret);
+        ELOG("wordexp(%s): error %d\n", filled, ret);
         result->has_errors = true;
+        free(filled);
         return;
     }
     if (override) {
@@ -436,6 +463,7 @@ CFGFUN(include, const char *override, const char *pattern) {
         include_plain(result, p.we_wordv, p.we_wordc);
     }
     wordfree(&p);
+    free(filled);
 }
 
 /*******************************************************************************

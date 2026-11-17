@@ -18,6 +18,20 @@
 SLIST_HEAD(variables_head, Variable);
 extern pid_t config_error_nagbar_pid;
 
+/**
+ * An include --override line as it was filled in when it was reached (see
+ * cfg_include()), for the variable-replaced contents of its file.
+ *
+ */
+struct filled_line {
+    /* The start of the line in the parsed contents of the file. */
+    const char *line;
+    /* The line with its variables replaced. */
+    char *contents;
+
+    TAILQ_ENTRY(filled_line) filled_lines;
+};
+
 struct parser_ctx {
     bool use_nagbar;
 
@@ -40,6 +54,12 @@ struct parser_ctx {
     struct stack *stack;
 
     struct variables_head variables;
+
+    /* The start of the line which is being parsed. */
+    const char *line;
+    /* The include --override lines of the file which is being parsed, as they
+     * were filled in when they were reached. */
+    TAILQ_HEAD(filled_lines_head, filled_line) filled_lines;
 
     bool has_errors;
 };
@@ -72,6 +92,13 @@ void start_config_error_nagbar(const char *configpath, bool has_errors);
  *
  */
 void free_variables(struct parser_ctx *ctx);
+
+/**
+ * Returns a newly allocated copy of the given string in which every occurrence
+ * of a variable (compared case-insensitively) is replaced by its value.
+ *
+ */
+char *replace_variables(struct variables_head *variables, const char *input);
 
 typedef enum {
     PARSE_FILE_FAILED = -1,

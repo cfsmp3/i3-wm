@@ -18,7 +18,8 @@
 # line, the last file with a given name wins, empty files and links to
 # /dev/null disable a name, and the winners are loaded in byte order. While the
 # winners are loaded, displaced files and disabled names stay skipped below the
-# line, and for the pending winners of enclosing lines.
+# line, and for the pending winners of enclosing lines. Variables in its
+# patterns are filled in when the line is reached.
 #
 use File::Temp qw(tempfile tempdir);
 use Cwd qw(abs_path);
@@ -268,6 +269,72 @@ EOT
 is_deeply(included_files($config),
     [ "$auser/20-entry", "$aother/40-slot" ],
     'a displaced file is skipped below the line when named by a hard link');
+
+################################################################################
+# Variables in the patterns of an include --override line are filled in when
+# the line is reached: values set in files loaded before count, values set in
+# displaced files do not, and a value set below a line only counts for later
+# lines.
+################################################################################
+
+my $vsys = "$dir/vars-sys";
+my $vuser = "$dir/vars-user";
+my $vgood = "$dir/vars-good";
+my $vbad = "$dir/vars-bad";
+mkdir $vsys;
+mkdir $vuser;
+mkdir $vgood;
+mkdir $vbad;
+
+write_file("$vsys/10-paths", "set \$target $vbad\n");
+write_file("$vuser/10-paths", "set \$target $vgood\n");
+write_file("$vgood/10-redefine", "set \$target $vbad\n");
+write_file("$vgood/20-good", "set \$unused good\n");
+write_file("$vbad/20-bad", "set \$unused bad\n");
+
+$config = <<EOT;
+font -misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1
+
+include --override $vsys/* $vuser/*
+include --override \$target/*
+EOT
+
+is_deeply(included_files($config),
+    [ "$vuser/10-paths", "$vgood/10-redefine", "$vgood/20-good" ],
+    'variables set in files loaded before the line are filled in');
+
+$config = <<EOT;
+font -misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1
+
+include --override $vsys/* $vuser/*
+include --override \$target/*
+include --override \$target/*
+EOT
+
+is_deeply(included_files($config),
+    [ "$vuser/10-paths", "$vgood/10-redefine", "$vgood/20-good", "$vbad/20-bad" ],
+    'a value set below a line counts for later lines');
+
+################################################################################
+# The variable-replaced contents in the GET_CONFIG reply show each
+# include --override line as it was filled in when it was reached.
+################################################################################
+
+my $pid = launch_with_config($config);
+my $i3 = i3(get_socket_path(0));
+my $config_reply = $i3->get_config()->recv;
+exit_gracefully($pid);
+
+my $replaced = $config_reply->{included_configs}->[0]->{variable_replaced_contents};
+my @override_lines = grep { /^include --override / } split(/\n/, $replaced);
+is_deeply(\@override_lines,
+    [ "include --override $vsys/* $vuser/*",
+      "include --override $vgood/*",
+      "include --override $vbad/*" ],
+    'override lines are shown as filled in when they were reached');
+like($config_reply->{included_configs}->[0]->{raw_contents},
+    qr/^include --override \$target\/\*$/m,
+    'raw contents keep the override lines as written');
 
 ################################################################################
 # The flag without a pattern is an error.

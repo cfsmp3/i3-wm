@@ -168,6 +168,7 @@ static void parse_config(struct parser_ctx *ctx, const char *input, struct conte
     const cmdp_token *token;
     bool token_handled;
     linecnt = 1;
+    ctx->line = input;
 
 #ifndef TEST_PARSER
     struct ConfigResultIR subcommand_output = {
@@ -295,6 +296,7 @@ static void parse_config(struct parser_ctx *ctx, const char *input, struct conte
                 token_handled = true;
                 linecnt++;
                 walk++;
+                ctx->line = walk;
                 break;
             }
 
@@ -311,6 +313,7 @@ static void parse_config(struct parser_ctx *ctx, const char *input, struct conte
 #endif
                     linecnt++;
                     walk++;
+                    ctx->line = walk;
                     break;
                 }
             }
@@ -606,6 +609,94 @@ void free_variables(struct parser_ctx *ctx) {
     }
 }
 
+/*
+ * Returns a newly allocated copy of the given string in which every occurrence
+ * of a variable (compared case-insensitively) is replaced by its value. Where
+ * the name of one variable is the prefix of another, the longer one is
+ * replaced (see upsert_variable()).
+ *
+ */
+char *replace_variables(struct variables_head *variables, const char *input) {
+    const size_t len = strlen(input);
+
+    /* For every custom variable, see how often it occurs in the input and
+     * how much extra bytes it requires when replaced. */
+    struct Variable *current;
+    int extra_bytes = 0;
+    /* We need to copy the input because we need to invalidate the
+     * variables (otherwise we will count them twice, which is bad when
+     * 'extra' is negative) */
+    char *bufcopy = sstrdup(input);
+    SLIST_FOREACH (current, variables, variables) {
+        const int extra = (strlen(current->value) - strlen(current->key));
+        for (char *next = bufcopy;
+             next < (bufcopy + len) &&
+             (next = strcasestr(next, current->key)) != NULL;) {
+            /* We need to invalidate variables completely (otherwise we may count
+             * the same variable more than once, thus causing buffer overflow or
+             * allocation failure) with spaces (variable names cannot contain spaces) */
+            const char *end = next + strlen(current->key);
+            while (next < end) {
+                *next++ = ' ';
+            }
+            extra_bytes += extra;
+        }
+    }
+    FREE(bufcopy);
+
+    /* Then, allocate a new buffer and copy the input over to the new one,
+     * but replace occurrences of our variables */
+    const char *walk = input;
+    char *new = scalloc(len + extra_bytes + 1, 1);
+    char *destwalk = new;
+    while (walk < (input + len)) {
+        /* Find the next variable */
+        SLIST_FOREACH (current, variables, variables) {
+            current->next_match = strcasestr(walk, current->key);
+        }
+        const struct Variable *nearest = NULL;
+        size_t distance = len;
+        SLIST_FOREACH (current, variables, variables) {
+            if (current->next_match == NULL) {
+                continue;
+            }
+            if ((size_t)(current->next_match - walk) < distance) {
+                distance = (current->next_match - walk);
+                nearest = current;
+            }
+        }
+        if (nearest == NULL) {
+            /* If there are no more variables, we just copy the rest */
+            strcpy(destwalk, walk);
+            break;
+        } else {
+            /* Copy until the next variable, then copy its value */
+            strncpy(destwalk, walk, distance);
+            strcpy(destwalk + distance, nearest->value);
+            walk += distance + strlen(nearest->key);
+            destwalk += distance + strlen(nearest->value);
+        }
+    }
+    return new;
+}
+
+/*
+ * Returns true if the given line is an include --override directive, matched
+ * the way the parser matches it (see parser-specs/config.spec). The variables
+ * in its patterns are filled in only when the line is reached (see
+ * cfg_include()), so that values set in files read before count.
+ *
+ */
+static bool is_include_override(const char *line) {
+    line += strspn(line, " \t");
+    if (strncasecmp(line, "include", strlen("include")) != 0) {
+        return false;
+    }
+    line += strlen("include");
+    line += strspn(line, " \t");
+    return (strncasecmp(line, "--override", strlen("--override")) == 0);
+}
+
 static bool try_chdir(const char *path) {
     bool result = true;
     char *dir = NULL;
@@ -752,75 +843,67 @@ static parse_file_result_t parse_file_inner(struct parser_ctx *ctx, const char *
         database = NULL;
     }
 
-    /* For every custom variable, see how often it occurs in the file and
-     * how much extra bytes it requires when replaced. */
-    struct Variable *current;
-    int extra_bytes = 0;
-    /* We need to copy the buffer because we need to invalidate the
-     * variables (otherwise we will count them twice, which is bad when
-     * 'extra' is negative) */
-    char *bufcopy = sstrdup(buf);
-    SLIST_FOREACH (current, &(ctx->variables), variables) {
-        const int extra = (strlen(current->value) - strlen(current->key));
-        for (char *next = bufcopy;
-             next < (bufcopy + stbuf.st_size) &&
-             (next = strcasestr(next, current->key)) != NULL;) {
-            /* We need to invalidate variables completely (otherwise we may count
-             * the same variable more than once, thus causing buffer overflow or
-             * allocation failure) with spaces (variable names cannot contain spaces) */
-            const char *end = next + strlen(current->key);
-            while (next < end) {
-                *next++ = ' ';
-            }
-            extra_bytes += extra;
+    /* Replace the variables, except in include --override lines, whose
+     * patterns are filled in only when the line is reached. Each stretch of
+     * other lines is replaced in one go; variable names and values cannot
+     * contain a newline, so this is the same as replacing line by line. */
+    char *new = sstrdup("");
+    size_t new_len = 0;
+    const char *chunk = buf;
+    for (const char *line = buf; *line != '\0' || chunk < line;) {
+        const char *eol = strchr(line, '\n');
+        const size_t line_len = (eol != NULL ? (size_t)(eol + 1 - line) : strlen(line));
+        const bool keep = (*line != '\0' && is_include_override(line));
+        if (keep || *line == '\0') {
+            /* Replace the variables in the lines before this one. */
+            char *copy = sstrndup(chunk, line - chunk);
+            char *replaced = replace_variables(&(ctx->variables), copy);
+            const size_t replaced_len = strlen(replaced);
+            new = srealloc(new, new_len + replaced_len + line_len + 1);
+            memcpy(new + new_len, replaced, replaced_len);
+            new_len += replaced_len;
+            /* Keep the include --override line as it is. */
+            memcpy(new + new_len, line, line_len);
+            new_len += line_len;
+            new[new_len] = '\0';
+            free(replaced);
+            free(copy);
+            chunk = line + line_len;
         }
+        line += line_len;
     }
-    FREE(bufcopy);
-
-    /* Then, allocate a new buffer and copy the file over to the new one,
-     * but replace occurrences of our variables */
-    const char *walk = buf;
-    char *new = scalloc(stbuf.st_size + extra_bytes + 1, 1);
-    char *destwalk = new;
-    while (walk < (buf + stbuf.st_size)) {
-        /* Find the next variable */
-        SLIST_FOREACH (current, &(ctx->variables), variables) {
-            current->next_match = strcasestr(walk, current->key);
-        }
-        const struct Variable *nearest = NULL;
-        int distance = stbuf.st_size;
-        SLIST_FOREACH (current, &(ctx->variables), variables) {
-            if (current->next_match == NULL) {
-                continue;
-            }
-            if ((current->next_match - walk) < distance) {
-                distance = (current->next_match - walk);
-                nearest = current;
-            }
-        }
-        if (nearest == NULL) {
-            /* If there are no more variables, we just copy the rest */
-            strncpy(destwalk, walk, (buf + stbuf.st_size) - walk);
-            destwalk += (buf + stbuf.st_size) - walk;
-            *destwalk = '\0';
-            break;
-        } else {
-            /* Copy until the next variable, then copy its value */
-            strncpy(destwalk, walk, distance);
-            strcpy(destwalk + distance, nearest->value);
-            walk += distance + strlen(nearest->key);
-            destwalk += distance + strlen(nearest->value);
-        }
-    }
-
-    included_file->variable_replaced_contents = sstrdup(new);
 
     struct context *context = scalloc(1, sizeof(struct context));
     context->filename = f;
+    TAILQ_INIT(&(ctx->filled_lines));
     parse_config(ctx, new, context);
     if (ctx->has_errors) {
         context->has_errors = true;
     }
+
+    /* In the variable-replaced contents, every include --override line which
+     * was reached is shown as it was filled in at that point. */
+    char *replaced = sstrdup("");
+    size_t replaced_len = 0;
+    const char *walk = new;
+    while (!TAILQ_EMPTY(&(ctx->filled_lines))) {
+        struct filled_line *filled = TAILQ_FIRST(&(ctx->filled_lines));
+        const char *eol = strchr(filled->line, '\n');
+        const size_t contents_len = strlen(filled->contents);
+        replaced = srealloc(replaced, replaced_len + (filled->line - walk) + contents_len + 1);
+        memcpy(replaced + replaced_len, walk, filled->line - walk);
+        replaced_len += filled->line - walk;
+        memcpy(replaced + replaced_len, filled->contents, contents_len + 1);
+        replaced_len += contents_len;
+        walk = (eol != NULL ? eol : filled->line + strlen(filled->line));
+
+        TAILQ_REMOVE(&(ctx->filled_lines), filled, filled_lines);
+        free(filled->contents);
+        free(filled);
+    }
+    replaced = srealloc(replaced, replaced_len + strlen(walk) + 1);
+    strcpy(replaced + replaced_len, walk);
+    included_file->variable_replaced_contents = replaced;
 
     check_for_duplicate_bindings(context);
 
