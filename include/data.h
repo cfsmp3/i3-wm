@@ -41,6 +41,7 @@
 
 /* Forward definitions */
 typedef struct Binding Binding;
+typedef struct GestureBinding GestureBinding;
 typedef struct Rect Rect;
 typedef struct xoutput Output;
 typedef struct Con Con;
@@ -113,8 +114,35 @@ typedef enum {
  */
 typedef enum {
     B_KEYBOARD = 0,
-    B_MOUSE = 1
+    B_MOUSE = 1,
+    B_GESTURE = 2
 } input_type_t;
+
+/**
+ * The kinds of touchpad gestures a gesture binding can be configured for.
+ * See GestureBinding::type.
+ */
+typedef enum {
+    GESTURE_TYPE_HOLD = 0,
+    GESTURE_TYPE_PINCH = 1,
+    GESTURE_TYPE_SWIPE = 2
+} gesture_type_t;
+
+/**
+ * Directions of a touchpad gesture. These are used as a bitmask, see
+ * GestureBinding::directions.
+ */
+typedef enum {
+    GESTURE_DIRECTION_NONE = 0,
+    GESTURE_DIRECTION_UP = (1 << 0),
+    GESTURE_DIRECTION_DOWN = (1 << 1),
+    GESTURE_DIRECTION_LEFT = (1 << 2),
+    GESTURE_DIRECTION_RIGHT = (1 << 3),
+    GESTURE_DIRECTION_INWARD = (1 << 4),
+    GESTURE_DIRECTION_OUTWARD = (1 << 5),
+    GESTURE_DIRECTION_CLOCKWISE = (1 << 6),
+    GESTURE_DIRECTION_COUNTERCLOCKWISE = (1 << 7)
+} gesture_direction_t;
 
 /**
  * Bitmask for matching XCB_XKB_GROUP_1 to XCB_XKB_GROUP_4.
@@ -373,6 +401,42 @@ struct Binding {
     char *command;
 
     TAILQ_ENTRY(Binding) bindings;
+};
+
+/**
+ * Holds a touchpad gesture binding (bindgesture), consisting of the kind of
+ * gesture, an optional number of fingers, a set of directions and the command
+ * which is executed when a matching gesture ends.
+ *
+ */
+struct GestureBinding {
+    /** The kind of gesture (pinch, hold or swipe). */
+    gesture_type_t type;
+
+    /** The number of fingers, or 0 if the binding applies to any number of
+     * fingers. */
+    uint8_t fingers;
+
+    /** Bitmask of gesture_direction_t values the gesture needs to have. 0
+     * means that the binding is not restricted to any direction. */
+    uint32_t directions;
+
+    /** If true, the directions of the gesture need to be exactly the
+     * directions of this binding (instead of a superset). */
+    bool exact;
+
+    /** The XInput name of the (slave) device this binding is restricted to,
+     * or NULL if the binding applies to all devices. */
+    char *input_device;
+
+    /** The gesture specification as given in the configuration file, e.g.
+     * "swipe:3:left". Used in IPC binding events. */
+    char *symbol;
+
+    /** Command, like in command mode */
+    char *command;
+
+    TAILQ_ENTRY(GestureBinding) gesture_bindings;
 };
 
 /**

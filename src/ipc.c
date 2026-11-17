@@ -335,7 +335,17 @@ static void dump_binding(yajl_gen gen, Binding *bind) {
     y(integer, bind->keycode);
 
     ystr("input_type");
-    ystr((const char *)(bind->input_type == B_KEYBOARD ? "keyboard" : "mouse"));
+    switch (bind->input_type) {
+        case B_KEYBOARD:
+            ystr("keyboard");
+            break;
+        case B_MOUSE:
+            ystr("mouse");
+            break;
+        case B_GESTURE:
+            ystr("gesture");
+            break;
+    }
 
     ystr("symbol");
     if (bind->symbol == NULL) {

@@ -1458,6 +1458,11 @@ void handle_event(int type, xcb_generic_event_t *event) {
         return;
     }
 
+    if (gestures_is_gesture_event(type, event)) {
+        handle_gesture_event(event);
+        return;
+    }
+
     if (shape_supported && type == shape_base + XCB_SHAPE_NOTIFY) {
         xcb_shape_notify_event_t *shape = (xcb_shape_notify_event_t *)event;
 

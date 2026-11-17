@@ -20,6 +20,13 @@ extern pid_t command_error_nagbar_pid;
 extern const char *DEFAULT_BINDING_MODE;
 
 /**
+ * Returns the mode specified by `name` or creates a new mode and adds it to
+ * the list of modes.
+ *
+ */
+struct Mode *mode_from_name(const char *name, bool pango_markup);
+
+/**
  * Adds a binding from config parameters given as strings and returns a
  * pointer to the binding structure. Returns NULL if the input code could not
  * be parsed.

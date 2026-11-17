@@ -72,6 +72,7 @@
 #include "commands.h"
 #include "commands_parser.h"
 #include "bindings.h"
+#include "gestures.h"
 #include "config_directives.h"
 #include "config_parser.h"
 #include "fake_outputs.h"

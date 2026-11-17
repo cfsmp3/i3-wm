@@ -78,9 +78,16 @@ CFGFUN(floating_modifier, const char *modifiers);
 CFGFUN(default_border, const char *windowtype, const char *border, const long width);
 CFGFUN(workspace, const char *workspace, const char *output);
 CFGFUN(binding, const char *bindtype, const char *modifiers, const char *key, const char *release, const char *border, const char *whole_window, const char *exclude_titlebar, const char *command);
+CFGFUN(gesture_start);
+CFGFUN(gesture_option, const char *option);
+CFGFUN(gesture_input_device, const char *input_device);
+CFGFUN(gesture_binding, const char *gesture, const char *command);
+CFGFUN(gesture_unbinding, const char *gesture);
 
 CFGFUN(enter_mode, const char *pango_markup, const char *modename);
 CFGFUN(mode_binding, const char *bindtype, const char *modifiers, const char *key, const char *release, const char *border, const char *whole_window, const char *exclude_titlebar, const char *command);
+CFGFUN(mode_gesture_binding, const char *gesture, const char *command);
+CFGFUN(mode_gesture_unbinding, const char *gesture);
 
 CFGFUN(bar_font, const char *font);
 CFGFUN(bar_separator_symbol, const char *separator);

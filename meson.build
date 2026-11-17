@@ -308,6 +308,7 @@ iconv_dep = cc.find_library('iconv', required: false)
 libsn_dep = dependency('libstartup-notification-1.0', method: 'pkg-config')
 xcb_dep = dependency('xcb', method: 'pkg-config')
 xcb_xkb_dep = dependency('xcb-xkb', method: 'pkg-config')
+xcb_xinput_dep = dependency('xcb-xinput', version: '>=1.15', method: 'pkg-config')
 xcb_xinerama_dep = dependency('xcb-xinerama', method: 'pkg-config')
 xcb_randr_dep = dependency('xcb-randr', method: 'pkg-config')
 xcb_shape_dep = dependency('xcb-shape', method: 'pkg-config')
@@ -393,6 +394,7 @@ i3srcs = [
   'src/fake_outputs.c',
   'src/floating.c',
   'src/gaps.c',
+  'src/gestures.c',
   'src/handlers.c',
   'src/ipc.c',
   'src/key_press.c',
@@ -468,6 +470,7 @@ common_deps = [
   libsn_dep,
   xcb_dep,
   xcb_xkb_dep,
+  xcb_xinput_dep,
   xcb_xinerama_dep,
   xcb_randr_dep,
   xcb_shape_dep,

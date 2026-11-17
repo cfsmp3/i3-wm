@@ -94,6 +94,7 @@ struct Mode {
     char *name;
     bool pango_markup;
     struct bindings_head *bindings;
+    struct gesture_bindings_head *gesture_bindings;
 
     SLIST_ENTRY(Mode) modes;
 };

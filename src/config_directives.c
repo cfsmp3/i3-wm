@@ -179,6 +179,52 @@ CFGFUN(binding, const char *bindtype, const char *modifiers, const char *key, co
     configure_binding(bindtype, modifiers, key, release, border, whole_window, exclude_titlebar, command, DEFAULT_BINDING_MODE, false);
 }
 
+/*
+ * The options of the bindgesture or unbindgesture line which is currently
+ * being parsed. The parser passes on every option separately, because options
+ * may be repeated: the last --input-device=<device> wins.
+ *
+ */
+static struct {
+    bool exact;
+    bool no_warn;
+    char *input_device;
+} gesture_options;
+
+CFGFUN(gesture_start) {
+    gesture_options.exact = false;
+    gesture_options.no_warn = false;
+    FREE(gesture_options.input_device);
+}
+
+CFGFUN(gesture_option, const char *option) {
+    if (strcmp(option, "--exact") == 0) {
+        gesture_options.exact = true;
+    } else if (strcmp(option, "--no-warn") == 0) {
+        gesture_options.no_warn = true;
+    }
+}
+
+CFGFUN(gesture_input_device, const char *input_device) {
+    FREE(gesture_options.input_device);
+    gesture_options.input_device = sstrdup(input_device);
+}
+
+CFGFUN(gesture_binding, const char *gesture, const char *command) {
+    if (!configure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+                                   gesture_options.no_warn,
+                                   gesture, command, DEFAULT_BINDING_MODE, false)) {
+        result->has_errors = true;
+    }
+}
+
+CFGFUN(gesture_unbinding, const char *gesture) {
+    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+                                     gesture, DEFAULT_BINDING_MODE)) {
+        result->has_errors = true;
+    }
+}
+
 /*******************************************************************************
  * Mode handling
  ******************************************************************************/
@@ -193,6 +239,31 @@ CFGFUN(mode_binding, const char *bindtype, const char *modifiers, const char *ke
     }
 
     configure_binding(bindtype, modifiers, key, release, border, whole_window, exclude_titlebar, command, current_mode, current_mode_pango_markup);
+}
+
+CFGFUN(mode_gesture_binding, const char *gesture, const char *command) {
+    if (current_mode == NULL) {
+        /* When using an invalid mode name, e.g. “default” */
+        return;
+    }
+
+    if (!configure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+                                   gesture_options.no_warn,
+                                   gesture, command, current_mode, current_mode_pango_markup)) {
+        result->has_errors = true;
+    }
+}
+
+CFGFUN(mode_gesture_unbinding, const char *gesture) {
+    if (current_mode == NULL) {
+        /* When using an invalid mode name, e.g. “default” */
+        return;
+    }
+
+    if (!unconfigure_gesture_binding(gesture_options.exact, gesture_options.input_device,
+                                     gesture, current_mode)) {
+        result->has_errors = true;
+    }
 }
 
 CFGFUN(enter_mode, const char *pango_markup, const char *modename) {

@@ -29,7 +29,7 @@ const char *DEFAULT_BINDING_MODE = "default";
  * the list of modes.
  *
  */
-static struct Mode *mode_from_name(const char *name, bool pango_markup) {
+struct Mode *mode_from_name(const char *name, bool pango_markup) {
     struct Mode *mode;
 
     /* Try to find the mode in the list of modes and return it */
@@ -45,6 +45,8 @@ static struct Mode *mode_from_name(const char *name, bool pango_markup) {
     mode->pango_markup = pango_markup;
     mode->bindings = scalloc(1, sizeof(struct bindings_head));
     TAILQ_INIT(mode->bindings);
+    mode->gesture_bindings = scalloc(1, sizeof(struct gesture_bindings_head));
+    TAILQ_INIT(mode->gesture_bindings);
     SLIST_INSERT_HEAD(&modes, mode, modes);
 
     return mode;
@@ -648,10 +650,12 @@ void switch_mode(const char *new_mode) {
 
         ungrab_all_keys(conn);
         bindings = mode->bindings;
+        gesture_bindings = mode->gesture_bindings;
         current_binding_mode = mode->name;
         translate_keysyms();
         grab_all_keys(conn);
         regrab_all_buttons(conn);
+        gestures_grab();
 
         /* Reset all B_UPON_KEYRELEASE_IGNORE_MODS bindings to avoid possibly
          * activating one of them. */

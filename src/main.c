@@ -84,6 +84,7 @@ const int default_shmlog_size = 25 * 1024 * 1024;
 
 /* The list of key bindings */
 struct bindings_head *bindings;
+struct gesture_bindings_head *gesture_bindings;
 const char *current_binding_mode = NULL;
 
 /* The list of exec-lines */
@@ -919,6 +920,9 @@ int main(int argc, char *argv[]) {
 
     translate_keysyms();
     grab_all_keys(conn);
+
+    gestures_init();
+    gestures_grab();
 
     bool needs_tree_init = true;
     if (layout_path != NULL) {

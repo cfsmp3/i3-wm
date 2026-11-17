@@ -8,7 +8,7 @@
 │ dependency   │ min.   │ lkgv   │ URL                                                         │
 ├──────────────┼────────┼────────┼─────────────────────────────────────────────────────────────┤
 │ pkg-config   │ 0.25   │ 0.29   │ https://pkgconfig.freedesktop.org/                          │
-│ libxcb       │ 1.1.93 │ 1.12   │ https://xcb.freedesktop.org/dist/                           │
+│ libxcb       │ 1.15   │ 1.17   │ https://xcb.freedesktop.org/dist/                           │
 │ xcb-util     │ 0.3.3  │ 0.4.1  │ https://xcb.freedesktop.org/dist/                           │
 │ xkbcommon    │ 0.4.0  │ 0.6.1  │ https://xkbcommon.org/                                      │
 │ xkbcommon-x11│ 0.4.0  │ 0.6.1  │ https://xkbcommon.org/                                      │

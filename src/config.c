@@ -52,6 +52,14 @@ static void free_configuration(void) {
         }
         FREE(mode->bindings);
 
+        /* Clear the old gesture binding list */
+        while (!TAILQ_EMPTY(mode->gesture_bindings)) {
+            GestureBinding *bind = TAILQ_FIRST(mode->gesture_bindings);
+            TAILQ_REMOVE(mode->gesture_bindings, bind, gesture_bindings);
+            gesture_binding_free(bind);
+        }
+        FREE(mode->gesture_bindings);
+
         SLIST_REMOVE(&modes, mode, Mode, modes);
         FREE(mode);
     }
@@ -173,9 +181,12 @@ bool load_configuration(const char *override_configpath, config_load_t load_type
     default_mode->name = sstrdup("default");
     default_mode->bindings = scalloc(1, sizeof(struct bindings_head));
     TAILQ_INIT(default_mode->bindings);
+    default_mode->gesture_bindings = scalloc(1, sizeof(struct gesture_bindings_head));
+    TAILQ_INIT(default_mode->gesture_bindings);
     SLIST_INSERT_HEAD(&modes, default_mode, modes);
 
     bindings = default_mode->bindings;
+    gesture_bindings = default_mode->gesture_bindings;
     current_binding_mode = default_mode->name;
 
     /* Clear the old config or initialize the data structure */
@@ -295,6 +306,7 @@ bool load_configuration(const char *override_configpath, config_load_t load_type
         translate_keysyms();
         grab_all_keys(conn);
         regrab_all_buttons(conn);
+        gestures_grab();
         gaps_reapply_workspace_assignments();
 
         /* Redraw the currently visible decorations on reload, so that the

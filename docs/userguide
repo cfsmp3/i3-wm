@@ -589,6 +589,169 @@ bindsym button9 move left
 bindsym button8 move right
 --------------------------------
 
+[[gesturebindings]]
+=== Gesture bindings
+
+A gesture binding makes i3 execute a command when you perform a touchpad
+gesture, such as swiping with three fingers or pinching with two. The syntax
+is the same as for sway's +bindgesture+, except that +--input-device+ takes the
+XInput device name (see below) instead of sway's input identifier. i3 receives
+the gestures from the X server via XInput 2.4, so this requires an X server and
+input driver (e.g. xf86-input-libinput) which support gesture events. On other
+X servers, i3 accepts gesture bindings, but they never trigger.
+
+*Syntax*:
+-------------------------------------------------------------------------------------
+bindgesture [--exact] [--input-device=<device>] [--no-warn] <type>[:<fingers>][:<directions>] command
+-------------------------------------------------------------------------------------
+
+The options have to be given before the gesture, in any order. An option may be
+given more than once; if +--input-device=<device>+ is given more than once, the
+last device counts. Everything after the gesture is the command (even if it
+looks like an option), which can be a chain of commands and can use
+<<command_criteria>>, just like the command of a key binding. <<variables>> can
+be used in the options, the gesture and the command. Gesture bindings can be put
+into <<binding_modes>> and included files like other bindings.
+
++<type>+ is one of +pinch+, +hold+ or +swipe+. The type and the directions are
+case sensitive, e.g. +Swipe+ or +LEFT+ are errors. Note that i3 never receives
+hold gestures from the X server, so +hold+ bindings are accepted but never
+trigger.
+
++<fingers>+ is the number of fingers (a single digit from 1 to 9). If it is
+omitted, the binding triggers for any number of fingers.
+
++<directions>+ is a list of directions joined by plus signs, e.g. +inward+up+.
+The order of the directions does not matter and repeating a direction has no
+effect. The available directions are +up+, +down+, +left+ and +right+ (the
+movement of the fingers), +inward+ and +outward+ (the change of the distance
+between the fingers of a pinch) as well as +clockwise+ and +counterclockwise+
+(the rotation of a pinch). +any+ does not restrict the direction, which is the
+same as omitting the directions; together with other directions, +any+ adds
+nothing (+left+any+ is the same as +left+). A +swipe+ only ever has one of
++up+, +down+, +left+ or +right+, so a swipe binding with any other direction
+never triggers. If the gesture is followed by only one segment, that segment is
+the number of fingers if it is a single digit from 1 to 9 and the list of
+directions otherwise.
+
++--input-device=<device>+ restricts the binding to gestures of the device with
+exactly this XInput name (as shown by +xinput list+, the name is case
+sensitive). Quote names which contain spaces, e.g.
++--input-device="SynPS/2 Synaptics TouchPad"+. +--input-device=*+ is the same
+as not specifying a device. The device name has to be joined to the option with
++=+.
+
+Two gesture bindings in the same mode which have the same kind of gesture,
+number of fingers, set of directions, device and +--exact+ setting are
+duplicates: the later binding replaces the earlier binding, and i3 reports this
+as an error like a duplicate key binding. Use +--no-warn+ on the later binding
+to replace the earlier binding silently.
+
+How i3 recognizes the directions of a gesture::
+	A gesture lasts from its begin event to its end event. If the gesture is
+	cancelled (e.g. because a finger is lifted too early), no binding
+	triggers at its end. The number of fingers and the device are those of
+	the begin event. The movement of all updates is summed up. If the
+	horizontal displacement is larger than the vertical displacement, the
+	gesture is +right+ (positive displacement) or +left+. Otherwise
+	(including when both are equal or the fingers did not move at all) it
+	is +down+ (positive displacement) or +up+. In addition, a pinch is
+	+clockwise+ if its summed up rotation is more than 5 degrees,
+	+counterclockwise+ if it is less than -5 degrees, +outward+ if its last
+	scale is above 1.1 and +inward+ if its last scale is below 0.9. Note that
+	a pinch therefore always has one of the movement directions, too.
+
+Which bindings trigger::
+	A binding triggers if its kind of gesture is the same, if it specifies
+	no number of fingers or the same number of fingers, if it specifies no
+	device or the device the gesture comes from, and if all of its directions
+	are directions of the gesture. With +--exact+, the directions of the
+	binding have to be exactly the directions of the gesture: for example,
+	+bindgesture --exact pinch:inward+ never triggers, as a pinch always also
+	has a movement direction, but +pinch:inward+up+ triggers for an inward
+	pinch without movement.
+
+Precedence::
+	If more than one binding of the current mode triggers, only one of them
+	is run: a binding for a specific device wins over a binding for all
+	devices, then a binding with +--exact+ wins over one without, then the
+	binding with more directions wins. If the bindings are still equally
+	specific, the one which comes later in the configuration file wins (a
+	binding which replaced a duplicate counts at the position of the
+	replacing line). The number of fingers and the modifier keys held during
+	the gesture do not matter for the precedence.
+
+Passing gestures to applications::
+	As soon as the current binding mode contains a binding for swipes, i3
+	grabs all swipes (regardless of their number of fingers, directions or
+	device, as the X server can only grab a kind of gesture as a whole), so
+	that applications no longer receive any swipes. A swipe which does not
+	match any binding then does nothing. The same applies to pinches. If the
+	current binding mode contains no binding for a kind of gesture,
+	applications receive these gestures as usual. +hold+ bindings never
+	grab anything, and
+	gestures of floating devices (see +xinput float+) are left alone.
+
+Binding modes, reload and restart::
+	i3 updates its grabs when switching binding modes, on +reload+ and on
+	+restart+. If the binding mode changes while a gesture is in progress,
+	the gesture is neither cancelled nor handed over part-way: whether
+	applications receive it was settled when it began, and the movement
+	gathered so far is kept. The mode in force when the gesture ends decides
+	which binding runs, and the binding event names that mode. A +reload+
+	or +restart+ starts without any gesture bindings and in the default
+	mode: only the bindings in the configuration (and the files it includes)
+	as read again are used afterwards.
+
+When a gesture binding runs, i3 sends a binding event with +input_type+
++"gesture"+ via IPC, see https://i3wm.org/docs/ipc.html#_binding_event.
+
+*Examples*:
+--------------------------------
+# Switch workspaces with three finger swipes
+bindgesture swipe:3:right workspace prev
+bindgesture swipe:3:left workspace next
+
+# Toggle fullscreen with a two finger pinch
+bindgesture pinch:2:outward fullscreen enable
+bindgesture pinch:2:inward fullscreen disable
+
+# A four finger swipe up on one specific touchpad only
+bindgesture --input-device="SynPS/2 Synaptics TouchPad" swipe:4:up scratchpad show
+
+# Rotating clockwise while pinching inward, regardless of any movement
+bindgesture pinch:inward+clockwise kill
+--------------------------------
+
+*Removing gesture bindings*:
+-------------------------------------------------------------------------------------
+unbindgesture [--exact] [--input-device=<device>] <type>[:<fingers>][:<directions>]
+-------------------------------------------------------------------------------------
+
++unbindgesture+ removes the gesture binding of the same mode which is the same
+as the given gesture: it has to match the binding in its device, its +--exact+
+setting, its set of directions, its number of fingers (or both specify no
+number of fingers) and its kind of gesture. As for duplicates,
++--input-device=*+ is the same as no device, +any+ the same as no direction and
+the order and repetition of options and directions does not matter. Nothing may
+follow the gesture, and +--no-warn+ is not accepted.
+
+Only bindings which were added earlier, by lines which were read before the
++unbindgesture+ line (including lines in files which were included earlier),
+can be removed; a binding added by a later line is added as usual. A removal in
+one mode does not affect the same binding in another mode. If there is no
+matching binding, this is an error like any other configuration error (but a
+later line can still add that binding). Removing a binding does not send an
+IPC event. If the last binding for swipes (or pinches) of a mode is removed,
+these gestures are passed to applications again while that mode is active.
+
+*Example*:
+--------------------------------
+include ~/.config/i3/gestures.conf
+# Do not use the four finger swipe from gestures.conf
+unbindgesture swipe:4:up
+--------------------------------
+
 [[binding_modes]]
 === Binding modes
 

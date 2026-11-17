@@ -72,6 +72,90 @@ is(parser_calls($config),
    'mode bindings ok');
 
 ################################################################################
+# gesture bindings
+################################################################################
+
+$config = <<'EOT';
+bindgesture swipe:3:left workspace prev
+bindgesture --exact pinch:2:inward+clockwise nop exact
+bindgesture --no-warn --input-device="Second Pad" --exact hold nop flags
+bindgesture --input-device=* swipe:right nop all devices
+bindgesture --input-device=Touchpad --input-device="Second Pad" --exact swipe nop repeated
+bindgesture swipe:left --exact nop option after the gesture
+unbindgesture --exact --input-device="Second Pad" pinch:2:inward+clockwise
+mode "meh" {
+    bindgesture swipe:4 nop in mode
+    bindgesture --exact --input-device="Touchpad" pinch:outward nop exact in mode
+    unbindgesture swipe:4
+}
+EOT
+
+$expected = <<'EOT';
+cfg_gesture_start()
+cfg_gesture_binding(swipe:3:left, workspace prev)
+cfg_gesture_start()
+cfg_gesture_option(--exact)
+cfg_gesture_binding(pinch:2:inward+clockwise, nop exact)
+cfg_gesture_start()
+cfg_gesture_option(--no-warn)
+cfg_gesture_input_device(Second Pad)
+cfg_gesture_option(--exact)
+cfg_gesture_binding(hold, nop flags)
+cfg_gesture_start()
+cfg_gesture_input_device(*)
+cfg_gesture_binding(swipe:right, nop all devices)
+cfg_gesture_start()
+cfg_gesture_input_device(Touchpad)
+cfg_gesture_input_device(Second Pad)
+cfg_gesture_option(--exact)
+cfg_gesture_binding(swipe, nop repeated)
+cfg_gesture_start()
+cfg_gesture_binding(swipe:left, --exact nop option after the gesture)
+cfg_gesture_start()
+cfg_gesture_option(--exact)
+cfg_gesture_input_device(Second Pad)
+cfg_gesture_unbinding(pinch:2:inward+clockwise)
+cfg_enter_mode((null), meh)
+cfg_gesture_start()
+cfg_mode_gesture_binding(swipe:4, nop in mode)
+cfg_gesture_start()
+cfg_gesture_option(--exact)
+cfg_gesture_input_device(Touchpad)
+cfg_mode_gesture_binding(pinch:outward, nop exact in mode)
+cfg_gesture_start()
+cfg_mode_gesture_unbinding(swipe:4)
+EOT
+
+is(parser_calls($config),
+   $expected,
+   'gesture bindings ok');
+
+$config = <<'EOT';
+unbindgesture --no-warn swipe:left
+unbindgesture swipe:left nop
+EOT
+
+$expected = <<'EOT';
+cfg_gesture_start()
+ERROR: CONFIG: Expected one of these tokens: <end>
+ERROR: CONFIG: (in file <stdin>)
+ERROR: CONFIG: Line   1: unbindgesture --no-warn swipe:left
+ERROR: CONFIG:                                   ^^^^^^^^^^
+ERROR: CONFIG: Line   2: unbindgesture swipe:left nop
+cfg_gesture_start()
+ERROR: CONFIG: Expected one of these tokens: <end>
+ERROR: CONFIG: (in file <stdin>)
+ERROR: CONFIG: Line   1: unbindgesture --no-warn swipe:left
+ERROR: CONFIG: Line   2: unbindgesture swipe:left nop
+ERROR: CONFIG:                                    ^^^
+EOT
+
+is(parser_calls($config),
+   $expected,
+   'invalid gesture binding removals');
+
+
+################################################################################
 # exec and exec_always
 ################################################################################
 
@@ -511,6 +595,8 @@ EOT
 my $expected_all_tokens = "ERROR: CONFIG: Expected one of these tokens: <end>, '#', '" . join("', '", 'set ', 'set	', qw(
         set_from_resource
         include
+        bindgesture
+        unbindgesture
         bindsym
         bindcode
         bind
@@ -747,7 +833,7 @@ EOT
 $expected = <<'EOT';
 cfg_enter_mode((null), yo)
 cfg_mode_binding(bindsym, (null), x, (null), (null), (null), (null), resize shrink left)
-ERROR: CONFIG: Expected one of these tokens: <end>, '#', 'set', 'bindsym', 'bindcode', 'bind', '}'
+ERROR: CONFIG: Expected one of these tokens: <end>, '#', 'set', 'bindgesture', 'unbindgesture', 'bindsym', 'bindcode', 'bind', '}'
 ERROR: CONFIG: (in file <stdin>)
 ERROR: CONFIG: Line   1: mode "yo" {
 ERROR: CONFIG: Line   2:     bindsym x resize shrink left

@@ -21,6 +21,8 @@ state INITIAL:
   'set	'                                  -> IGNORE_LINE
   'set_from_resource'                      -> IGNORE_LINE
   'include'                                -> INCLUDE
+  'bindgesture'                            -> call cfg_gesture_start(); GESTURE
+  'unbindgesture'                          -> call cfg_gesture_start(); UNBIND_GESTURE
   bindtype = 'bindsym', 'bindcode', 'bind' -> BINDING
   'bar'                                    -> BARBRACE
   'font'                                   -> FONT
@@ -463,6 +465,43 @@ state BINDCOMMAND:
   command = string
       -> call cfg_binding($bindtype, $modifiers, $key, $release, $border, $whole_window, $exclude_titlebar, $command)
 
+# bindgesture [--exact] [--input-device=<device>] [--no-warn] <gesture> <command>
+#
+# Each option is passed on by a separate call (and may be repeated, the last
+# --input-device=<device> wins).
+state GESTURE:
+  option = '--exact', '--no-warn'
+      -> call cfg_gesture_option($option); GESTURE
+  '--input-device='
+      -> GESTURE_INPUT_DEVICE
+  gesture = word
+      -> GESTURE_COMMAND
+
+state GESTURE_INPUT_DEVICE:
+  input_device = word
+      -> call cfg_gesture_input_device($input_device); GESTURE
+
+state GESTURE_COMMAND:
+  command = string
+      -> call cfg_gesture_binding($gesture, $command)
+
+# unbindgesture [--exact] [--input-device=<device>] <gesture>
+state UNBIND_GESTURE:
+  option = '--exact'
+      -> call cfg_gesture_option($option); UNBIND_GESTURE
+  '--input-device='
+      -> UNBIND_GESTURE_INPUT_DEVICE
+  gesture = word
+      -> UNBIND_GESTURE_END
+
+state UNBIND_GESTURE_INPUT_DEVICE:
+  input_device = word
+      -> call cfg_gesture_input_device($input_device); UNBIND_GESTURE
+
+state UNBIND_GESTURE_END:
+  end
+      -> call cfg_gesture_unbinding($gesture)
+
 ################################################################################
 # Mode configuration
 ################################################################################
@@ -484,6 +523,10 @@ state MODE:
   error ->
   '#' -> MODE_IGNORE_LINE
   'set' -> MODE_IGNORE_LINE
+  'bindgesture'
+      -> call cfg_gesture_start(); MODE_GESTURE
+  'unbindgesture'
+      -> call cfg_gesture_start(); MODE_UNBIND_GESTURE
   bindtype = 'bindsym', 'bindcode', 'bind'
       -> MODE_BINDING
   '}'
@@ -521,6 +564,38 @@ state MODE_BINDCOMMAND:
       ->
   command = string
       -> call cfg_mode_binding($bindtype, $modifiers, $key, $release, $border, $whole_window, $exclude_titlebar, $command); MODE
+
+state MODE_GESTURE:
+  option = '--exact', '--no-warn'
+      -> call cfg_gesture_option($option); MODE_GESTURE
+  '--input-device='
+      -> MODE_GESTURE_INPUT_DEVICE
+  gesture = word
+      -> MODE_GESTURE_COMMAND
+
+state MODE_GESTURE_INPUT_DEVICE:
+  input_device = word
+      -> call cfg_gesture_input_device($input_device); MODE_GESTURE
+
+state MODE_GESTURE_COMMAND:
+  command = string
+      -> call cfg_mode_gesture_binding($gesture, $command); MODE
+
+state MODE_UNBIND_GESTURE:
+  option = '--exact'
+      -> call cfg_gesture_option($option); MODE_UNBIND_GESTURE
+  '--input-device='
+      -> MODE_UNBIND_GESTURE_INPUT_DEVICE
+  gesture = word
+      -> MODE_UNBIND_GESTURE_END
+
+state MODE_UNBIND_GESTURE_INPUT_DEVICE:
+  input_device = word
+      -> call cfg_gesture_input_device($input_device); MODE_UNBIND_GESTURE
+
+state MODE_UNBIND_GESTURE_END:
+  end
+      -> call cfg_mode_gesture_unbinding($gesture); MODE
 
 ################################################################################
 # Bar configuration (i3bar)

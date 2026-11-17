@@ -51,6 +51,7 @@ extern xcb_key_symbols_t *keysyms;
 extern char **start_argv;
 extern int xkb_current_group;
 extern TAILQ_HEAD(bindings_head, Binding) *bindings;
+extern TAILQ_HEAD(gesture_bindings_head, GestureBinding) *gesture_bindings;
 extern const char *current_binding_mode;
 extern TAILQ_HEAD(autostarts_head, Autostart) autostarts;
 extern TAILQ_HEAD(autostarts_always_head, Autostart) autostarts_always;
