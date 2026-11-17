@@ -100,10 +100,12 @@ state SMART_GAPS:
   enabled = 'inverse_outer'
       -> call cfg_smart_gaps($enabled)
 
-# include <pattern>
+# include [--override] <pattern>
 state INCLUDE:
+  override = '--override'
+      ->
   pattern = string
-      -> call cfg_include($pattern)
+      -> call cfg_include($override, $pattern)
 
 # floating_minimum_size <width> x <height>
 state FLOATING_MINIMUM_SIZE_WIDTH:
